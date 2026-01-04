@@ -1,0 +1,240 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{makeidx}
+
+%New colors defined below
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+%Code listing style named "mystyle"
+\lstdefinestyle{mystyle}{
+  backgroundcolor=\color{backcolour},   commentstyle=\color{codegreen},
+  keywordstyle=\color{magenta},
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{codepurple},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,         
+  breaklines=true,                 
+  captionpos=b,                    
+  keepspaces=true,                 
+  numbers=left,                    
+  numbersep=5pt,                  
+  showspaces=false,                
+  showstringspaces=false,
+  showtabs=false,                  
+  tabsize=2
+}
+
+%"mystyle" code listing set
+\lstset{style=mystyle}
+
+\makeindex
+
+\title{Sistemska programska oprema - seminar: odlagališče (clipboard)}
+\author{Jakob Jesenko}
+\date{Januar 2026}
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Uvod}
+Odložišče (clipboard) ali odlagališče je eden od temeljnih delov operacijskega sistema, ki uporabniku omogoča kopiranje in lepljenje podatkov med aplikacijami, ter začasno shranjevanje podatkov za prenos med procesi. Kljub temu, da je implementacija med sistemi različna, se po funkcionalnosti odložišče bistveno ne razlikuje.
+
+
+This report explores:
+\begin{itemize}
+    \item How the clipboard works in Linux (X11 vs. Wayland).
+    \item Key differences from Windows' clipboard implementation.
+    \item Tools like `xclip` and their role in managing clipboard operations.
+    \item Underlying protocols and memory management.
+\end{itemize}
+
+\section{Odložišče v sistemih linux}
+
+\subsection{Pregled serverjev X11 in Wayland}
+
+linux izvorno uporablja \textbf{X Window System (X11)}, ki ponuja model porabnik-strežnik za grafične uporabniške vmesnike. V zadnjem čacu pa se zaradi večje varnosti in performance vedno bolj uporablja grafični strežnik \textbf{Wayland}.
+
+
+\subsubsection{Ključne razlike pri odložišču med X11 in Wayland}
+
+
+\begin{tabular}{|p{3.2cm}|p{3.8cm}|p{3.8cm}|}
+    \hline
+    Funkcija  & X11   & Wayland \\
+    \hline
+    Primary Selection  & Omogočeno (lepljenje s srednjim klikom) & Ni privzeto omogočeno \\
+    Clipboard Selection & Omogočeno (Ctrl+C, Ctrl+V) & Omogočeno (Ctrl+C, Ctrl+V) \\
+    Model odložišča & Centraliziran (vodi ga X server) & Decentraliziran (voden s strani kompozitorja ali aplikacij) \\
+    Protokol & X11 protocol (binarno) & Wayland protocol (Enostavnejši, hitrejši) \\
+    Orodja & `xclip`, `xsel` & `wl-clipboard`, `waybar-clipboard` \\
+    \hline
+\end{tabular}
+
+
+
+
+\subsection{Kako deljue odložišče}
+
+
+\subsubsection{X11}
+
+X11 definira dva razdelka:
+\begin{itemize}
+    \item \textbf{Primary Selection (Middle-Click Paste)}
+
+    - Uporablja se za drag\&drop ali lepljenje z srednjim klikom \\
+    - Vsebuje vsebino, ki je trenutno označena
+\item \textbf{Clipboard Selection (Ctrl+C/Ctrl+V)}
+
+   - Bolj podobna Windows odložišču
+\end{itemize}
+
+\textbf{Pretok podatkov v X11:}
+\begin{enumerate}
+    \item Aplikacija (n.p.r., terminal) kopira podatke s funkcijo `XSetSelectionOwner`.
+    \item X server zabeleži trenutnega lastnika razdelka.
+    \item druga aplikacija zahteva podatke s funkcijo `XConvertSelection`.
+    \item Lastnik razdelka pošlje podatke drugi aplikaciji, če ima le-ta dovoljenje za dostop.
+\end{enumerate}
+
+
+\subsubsection{Wayland}
+
+Wayland privzeto ne podpira razdelka primary selection, iz tega izhajajo določene spremembe:
+\begin{itemize}
+    \item Operacije odložišča mnogokrat izvaja kompozitor (GNOME Shell, KWin).
+    \item Orodja kot so `wl-clipboard` uporabljajo DBus za komunikacijo med procesi.
+    \item Če je potrebno se lahko lepljenje s srednjim klikom emulira.
+\end{itemize}
+
+
+
+\subsection{Odorja za uporabo odložišča v sistemih Linux}
+
+\subsubsection{`xclip` (X11)}
+
+
+- Command-line orodje, za delo z X11 odložiščem. \\
+- omogoča kopiranje (`xclip -selection clipboard`) in lepljenje (`xclip -o`).
+
+\textbf{Primer uporabe:}
+\begin{lstlisting}[language=bash]
+echo "Hello, world!" | xclip -selection clipboard  # Copy to clipboard
+xclip -selection clipboard -o                   # Paste from clipboard
+\end{lstlisting}
+
+\subsubsection{`wl-clipboard` (Wayland)}
+
+- Ekvivalent za Wayland seje. \\
+- uoprablja protokol DBus namesto X11.
+
+\textbf{Primer uporabe:}
+\begin{lstlisting}[language=bash]
+echo "Hello, world!" | wl-copy  # Copy to clipboard
+wl-paste                     # Paste from clipboard
+\end{lstlisting}
+
+\subsubsection{GUI Clipboard Managers}
+
+- \textbf{GNOME}: uporablja `gnome-clipboard` (DBus-based). \\
+- \textbf{KDE Plasma}: uporablja `kde-clipboard` (Qt-based).
+
+
+
+\section{Odložišče v sistemu Windows}
+
+Windows ima od odložišča bolj centraliziran in poenoten pristop, kar omogoča med drugim enostavnejšo integracijo pri razvoju programske opreme. Na sistemu windows je boljša podpora za druge podatkovne tipe. Od Windows 10 je privzeto na voljo tudi zgodovina odložišča, iz katere se lahko lepi podatke, ki niso bili kopirani zadnji.
+
+\subsection{Ključne lastnosti}
+
+\begin{itemize}
+    \item \textbf{enoten model odložišča:}
+    
+  - Za razliko od sistemov Linux, Windows uporablja le en razdelek za odložišče (`Ctrl+C`, `Ctrl+V`). \\
+  - Lepljenje s srednjim klikom ni podprto (nekatere aplikacije pa ga vseeno uporabljajo interno).
+
+  \item \textbf{Obogateni podatkovni formati:}
+  
+  - Omogoča kompleksne podatkovne tipe (n.p.r., slike, HTML). \\
+  - Uporablja Windows API (`OpenClipboard`, `EmptyClipboard`, `SetClipboardData`).
+\end{itemize}
+
+
+
+\subsection{Kako deluje odložišče na sistemu Windows}
+
+\begin{enumerate}
+    \item Aplikacija registrira podatkovni tip, ki ga bo kopirala.
+    \item Aplikacija zaklene odložišče s funkcijo `OpenClipboard`.
+    \item S funkcijo `SetClipboardData` aplikacija naloži podatke v odložišče v določenem formatu.
+    \item Druga aplikacija zahteva podatke iz odložišča s funkcijo `GetClipboardData`.
+    \item Operacijski sistem skrbi za lastništvo in pretvorbo med formati.
+\end{enumerate}
+
+\textbf{Primer izpisa vsebine odložišča (C++):}
+\begin{lstlisting}[language=C++]
+#include <windows.h>
+
+int main() {
+    if (OpenClipboard(NULL)) {
+        HGLOBAL hMem = GetClipboardData(CF_TEXT);
+        char* text = (char*)GlobalLock(hMem);
+        printf("Clipboard: %s\n", text);
+        GlobalUnlock(hMem);
+        CloseClipboard();
+    }
+    return 0;
+}
+\end{lstlisting}
+
+
+\section{Primerjava in ovire}
+
+\subsection{Ovire na sistemih Linux}
+
+\begin{itemize}
+    \item Razlike med distribucijami otežujejo delo razvijalcem programske opreme.
+    \item Orodja kot so `xclip` ne delujejo na vseh sistemih.
+    \item Nekatere aplikacije ne omogočajo dostopa do podatkov iz varnostnih razlogov.
+    \item Podpora kompleksnih podatkovnih tipov ni tako močna kot na sistemu windows.
+\end{itemize}
+
+
+\subsection{Prednosti na sistemu Windows}
+\begin{itemize}
+    \item \textbf{Enoten Model}: enostavnejši za razvoj programske opreme (eno odložišče).
+    \item \textbf{Podpora obogatenih podatkov}: Boljša podpora za kompleksne podatkovne tipe.
+    \item \textbf{Stabilnost}: Implementacija je enotna za razliko od sistemov Linux.
+\end{itemize}
+
+
+\section{Zaključek}
+
+Kljub podobnosti delovanja odložišča na različnih sistemih, se implementacija v pordobnostih razlikuje. Sistemi z grafičnim strežnikom X11 ponujajo fleksibilno, a bolj kompleksno, odložišče, ki ponuja dva razdelka, ki se lahko uporabljata hkrati. Za delo z odložiščem lahko uporabljamo orodja kot so `xclip`. Windows ponuja poenoteno storitev odložišča, do katere je dostopanje manj zahtevno in ponuja večji izbor podatkovnih tipov. Za konverzijo med tipi skrbi operacijski sistem. Poleg tega pa Windows privzeto omogoča dostop do zgodovine odložišča. Do razširjene funkcionalnosti odložišča na sistemih Linux laho dostopamo preko GUI clipboard Manager-jev.
+
+\section{Literatura}
+
+\noindent
+[1] Clipboard. Microsoft [Online] Dosegljivo: https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard (Zadnjič obiskano 1. 1. 2026) \\
+
+\noindent
+[2] X11: How does "the" clipboard work? Uninformativ [Online] Dosegljivo: https://www.uninformativ.de/blog/postings/2017-04-02/0/POSTING-en.html (Zadnjič obiskano 1. 1. 2026) \\
+
+\noindent
+[3] Wayland protocol. Freedesktop [Online] Dosegljivo: https://wayland.freedesktop.org/docs/html/ (Zadnjič obiskano 1. 1. 2026) \\
+
+\noindent
+[4] N. Pečenko, "Moj 1. Linux", str. 88, 2003 \\
+
+\end{document}
